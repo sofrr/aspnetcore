@@ -24,10 +24,15 @@ internal class RoutePatternHighlighter : IAspNetCoreEmbeddedLanguageDocumentHigh
     {
         var wellKnownTypes = WellKnownTypes.GetOrCreate(semanticModel.Compilation);
 
-        var usageContext = RoutePatternUsageDetector.BuildContext(token, semanticModel, wellKnownTypes, cancellationToken);
+        if (!RouteStringSyntaxDetector.IsRouteStringSyntaxToken(token, semanticModel, cancellationToken, out var options))
+        {
+            return ImmutableArray<AspNetCoreDocumentHighlights>.Empty;
+        }
+
+        var usageContext = RoutePatternUsageDetector.BuildContext(options, token, semanticModel, wellKnownTypes, cancellationToken);
 
         var virtualChars = CSharpVirtualCharService.Instance.TryConvertToVirtualChars(token);
-        var tree = RoutePatternParser.TryParse(virtualChars, supportTokenReplacement: usageContext.IsMvcAttribute);
+        var tree = RoutePatternParser.TryParse(virtualChars, usageContext.RoutePatternOptions);
         if (tree == null)
         {
             return ImmutableArray<AspNetCoreDocumentHighlights>.Empty;

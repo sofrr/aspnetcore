@@ -20,10 +20,15 @@ internal class RoutePatternBraceMatcher : IAspNetCoreEmbeddedLanguageBraceMatche
     public AspNetCoreBraceMatchingResult? FindBraces(SemanticModel semanticModel, SyntaxToken token, int position, CancellationToken cancellationToken)
     {
         var wellKnownTypes = WellKnownTypes.GetOrCreate(semanticModel.Compilation);
-        var usageContext = RoutePatternUsageDetector.BuildContext(token, semanticModel, wellKnownTypes, cancellationToken);
+        if (!RouteStringSyntaxDetector.IsRouteStringSyntaxToken(token, semanticModel, cancellationToken, out var options))
+        {
+            return null;
+        }
+
+        var usageContext = RoutePatternUsageDetector.BuildContext(options, token, semanticModel, wellKnownTypes, cancellationToken);
 
         var virtualChars = CSharpVirtualCharService.Instance.TryConvertToVirtualChars(token);
-        var tree = RoutePatternParser.TryParse(virtualChars, supportTokenReplacement: usageContext.IsMvcAttribute);
+        var tree = RoutePatternParser.TryParse(virtualChars, usageContext.RoutePatternOptions);
         if (tree == null)
         {
             return null;

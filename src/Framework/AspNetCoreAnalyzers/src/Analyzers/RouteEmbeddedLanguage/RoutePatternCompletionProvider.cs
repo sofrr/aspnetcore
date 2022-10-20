@@ -105,17 +105,17 @@ public class RoutePatternCompletionProvider : CompletionProvider
 
         var wellKnownTypes = WellKnownTypes.GetOrCreate(semanticModel.Compilation);
 
-        var (methodSymbol, _, isMinimal, isMvcAttribute) = RoutePatternUsageDetector.BuildContext(stringToken, semanticModel, wellKnownTypes, context.CancellationToken);
+        var usageContext = RoutePatternUsageDetector.BuildContext(options, stringToken, semanticModel, wellKnownTypes, context.CancellationToken);
 
         var virtualChars = CSharpVirtualCharService.Instance.TryConvertToVirtualChars(stringToken);
-        var tree = RoutePatternParser.TryParse(virtualChars, supportTokenReplacement: isMvcAttribute);
+        var tree = RoutePatternParser.TryParse(virtualChars, usageContext.RoutePatternOptions);
         if (tree == null)
         {
             return;
         }
 
         var routePatternCompletionContext = new EmbeddedCompletionContext(
-            context, tree, stringToken, wellKnownTypes, methodSymbol, options, isMinimal, isMvcAttribute);
+            context, tree, stringToken, wellKnownTypes, usageContext.MethodSymbol, options, usageContext.IsMinimal, usageContext.IsMvcAttribute, usageContext.IsComponent);
         ProvideCompletions(routePatternCompletionContext);
 
         if (routePatternCompletionContext.Items.Count == 0)
@@ -328,6 +328,7 @@ If there are two arguments then the string length must be greater than, or equal
         public readonly IMethodSymbol? MethodSymbol;
         public readonly bool IsMinimal;
         public readonly bool IsMvcAttribute;
+        public readonly bool IsComponent;
         public readonly CancellationToken CancellationToken;
         public readonly int Position;
         public readonly CompletionTrigger Trigger;
@@ -348,7 +349,8 @@ If there are two arguments then the string length must be greater than, or equal
             IMethodSymbol? methodSymbol,
             RouteOptions options,
             bool isMinimal,
-            bool isMvcAttribute)
+            bool isMvcAttribute,
+            bool isComponent)
         {
             _context = context;
             Tree = tree;
@@ -358,6 +360,7 @@ If there are two arguments then the string length must be greater than, or equal
             Options = options;
             IsMinimal = isMinimal;
             IsMvcAttribute = isMvcAttribute;
+            IsComponent = isComponent;
             Position = _context.Position;
             Trigger = _context.Trigger;
             CancellationToken = _context.CancellationToken;

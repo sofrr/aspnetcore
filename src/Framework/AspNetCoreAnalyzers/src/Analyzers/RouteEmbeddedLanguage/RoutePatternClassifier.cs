@@ -14,15 +14,20 @@ using Microsoft.AspNetCore.App.Analyzers.Infrastructure;
 namespace Microsoft.AspNetCore.Analyzers.RouteEmbeddedLanguage;
 
 [ExportAspNetCoreEmbeddedLanguageClassifier(name: "Route", language: LanguageNames.CSharp)]
-internal class RoutePatternClassifier : IAspNetCoreEmbeddedLanguageClassifier
+internal sealed class RoutePatternClassifier : IAspNetCoreEmbeddedLanguageClassifier
 {
     public void RegisterClassifications(AspNetCoreEmbeddedLanguageClassificationContext context)
     {
         var wellKnownTypes = WellKnownTypes.GetOrCreate(context.SemanticModel.Compilation);
-        var usageContext = RoutePatternUsageDetector.BuildContext(context.SyntaxToken, context.SemanticModel, wellKnownTypes, context.CancellationToken);
+        if (!RouteStringSyntaxDetector.IsRouteStringSyntaxToken(context.SyntaxToken, context.SemanticModel, context.CancellationToken, out var options))
+        {
+            return;
+        }
+
+        var usageContext = RoutePatternUsageDetector.BuildContext(options, context.SyntaxToken, context.SemanticModel, wellKnownTypes, context.CancellationToken);
 
         var virtualChars = CSharpVirtualCharService.Instance.TryConvertToVirtualChars(context.SyntaxToken);
-        var tree = RoutePatternParser.TryParse(virtualChars, supportTokenReplacement: usageContext.IsMvcAttribute);
+        var tree = RoutePatternParser.TryParse(virtualChars, usageContext.RoutePatternOptions);
 
         if (tree != null)
         {

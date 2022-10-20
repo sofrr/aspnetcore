@@ -53,15 +53,15 @@ public class RoutePatternAnalyzer : DiagnosticAnalyzer
             else
             {
                 var token = child.AsToken();
-                if (!RouteStringSyntaxDetector.IsRouteStringSyntaxToken(token, context.SemanticModel, cancellationToken, out var _))
+                if (!RouteStringSyntaxDetector.IsRouteStringSyntaxToken(token, context.SemanticModel, cancellationToken, out var options))
                 {
                     continue;
                 }
 
-                var usageContext = RoutePatternUsageDetector.BuildContext(token, context.SemanticModel, wellKnownTypes, cancellationToken);
+                var usageContext = RoutePatternUsageDetector.BuildContext(options, token, context.SemanticModel, wellKnownTypes, cancellationToken);
 
                 var virtualChars = CSharpVirtualCharService.Instance.TryConvertToVirtualChars(token);
-                var tree = RoutePatternParser.TryParse(virtualChars, supportTokenReplacement: usageContext.IsMvcAttribute);
+                var tree = RoutePatternParser.TryParse(virtualChars, usageContext.RoutePatternOptions);
                 if (tree == null)
                 {
                     continue;
