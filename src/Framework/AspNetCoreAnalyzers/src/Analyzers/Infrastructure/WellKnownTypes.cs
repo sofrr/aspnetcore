@@ -55,7 +55,7 @@ internal enum WellKnownType
     System_Threading_Tasks_Task_T,
 }
 
-internal class WellKnownTypes
+internal sealed class WellKnownTypes
 {
     private static readonly BoundedCacheWithFactory<Compilation, WellKnownTypes> LazyWellKnownTypesCache = new();
     private static readonly string[] WellKnownTypeNames = new[]
