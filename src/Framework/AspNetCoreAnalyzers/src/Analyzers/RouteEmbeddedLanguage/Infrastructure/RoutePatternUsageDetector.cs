@@ -12,11 +12,25 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Microsoft.AspNetCore.Analyzers.RouteEmbeddedLanguage.Infrastructure;
 
+internal enum RoutePatternUsageType
+{
+    Other,
+    MinimalApi,
+    MvcAction,
+    MvcController
+}
+
+internal record struct ParameterSymbol(ISymbol Symbol, ISymbol? TopLevelSymbol = null)
+{
+    public bool IsNested => TopLevelSymbol != null;
+}
+
 internal readonly record struct RoutePatternUsageContext(
     IMethodSymbol? MethodSymbol,
     SyntaxNode? MethodSyntax,
-    bool IsMinimal,
-    bool IsMvcAttribute);
+    RoutePatternUsageType UsageType,
+    ImmutableArray<ISymbol> Parameters,
+    ImmutableArray<ParameterSymbol> ResolvedParameters);
 
 internal readonly record struct MapMethodParts(
     IMethodSymbol Method,
@@ -49,8 +63,19 @@ internal static class RoutePatternUsageDetector
 
             // Get the map method delegate.
             var mapMethodSymbol = GetMethodInfo(semanticModel, mapMethodParts.Value.DelegateExpression, cancellationToken);
+            if (mapMethodSymbol == null)
+            {
+                return default;
+            }
 
-            return new(MethodSymbol: mapMethodSymbol, MethodSyntax: mapMethodParts.Value.DelegateExpression, IsMinimal: true, IsMvcAttribute: false);
+            var parameterSymbols = RoutePatternParametersDetector.GetParameterSymbols(mapMethodSymbol);
+            var resolvedParameterSymbols = RoutePatternParametersDetector.ResolvedParameters(mapMethodSymbol, wellKnownTypes);
+            return new(
+                MethodSymbol: mapMethodSymbol,
+                MethodSyntax: mapMethodParts.Value.DelegateExpression,
+                UsageType: RoutePatternUsageType.MinimalApi,
+                Parameters: parameterSymbols,
+                ResolvedParameters: resolvedParameterSymbols);
         }
         else if (container.Parent.IsKind(SyntaxKind.AttributeArgument))
         {
@@ -65,13 +90,26 @@ internal static class RoutePatternUsageDetector
                 {
                     return default;
                 }
-                return new(MethodSymbol: actionMethodSymbol, MethodSyntax: methodDeclarationSyntax, IsMinimal: false, IsMvcAttribute: true);
+
+                var parameterSymbols = RoutePatternParametersDetector.GetParameterSymbols(actionMethodSymbol);
+                var resolvedParameterSymbols = RoutePatternParametersDetector.ResolvedParameters(actionMethodSymbol, wellKnownTypes);
+                return new(
+                    MethodSymbol: actionMethodSymbol,
+                    MethodSyntax: methodDeclarationSyntax,
+                    UsageType: RoutePatternUsageType.MvcAction,
+                    Parameters: parameterSymbols,
+                    ResolvedParameters: resolvedParameterSymbols);
             }
             else if (attributeParent is ClassDeclarationSyntax classDeclarationSyntax)
             {
                 var classSymbol = semanticModel.GetDeclaredSymbol(classDeclarationSyntax, cancellationToken);
-
-                return new(MethodSymbol: null, MethodSyntax: null, IsMinimal: false, IsMvcAttribute: MvcDetector.IsController(classSymbol, wellKnownTypes));
+                var usageType = MvcDetector.IsController(classSymbol, wellKnownTypes) ? RoutePatternUsageType.MvcController : RoutePatternUsageType.Other;
+                return new(
+                    MethodSymbol: null,
+                    MethodSyntax: null,
+                    UsageType: usageType,
+                    Parameters: ImmutableArray<ISymbol>.Empty,
+                    ResolvedParameters: ImmutableArray<ParameterSymbol>.Empty);
             }
         }
 

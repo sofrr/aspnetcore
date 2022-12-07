@@ -226,14 +226,10 @@ public sealed class FrameworkParametersCompletionProvider : CompletionProvider
             return;
         }
 
-        var virtualChars = CSharpVirtualCharService.Instance.TryConvertToVirtualChars(routeStringToken);
-        var tree = RoutePatternParser.TryParse(virtualChars, supportTokenReplacement: false);
-        if (tree == null)
-        {
-            return;
-        }
+        var routeUsageCache = RouteUsageCache.GetOrCreate(semanticModel.Compilation);
+        var routeUsage = routeUsageCache.Get(routeStringToken, context.CancellationToken);
 
-        var routePatternCompletionContext = new EmbeddedCompletionContext(context, tree, wellKnownTypes);
+        var routePatternCompletionContext = new EmbeddedCompletionContext(context, routeUsage.RoutePattern);
 
         var existingParameterNames = GetExistingParameterNames(methodNode);
         foreach (var parameterName in existingParameterNames)
@@ -556,7 +552,6 @@ public sealed class FrameworkParametersCompletionProvider : CompletionProvider
         private readonly HashSet<string> _names = new(StringComparer.OrdinalIgnoreCase);
 
         public readonly RoutePatternTree Tree;
-        public readonly WellKnownTypes WellKnownTypes;
         public readonly CancellationToken CancellationToken;
         public readonly int Position;
         public readonly CompletionTrigger Trigger;
@@ -570,12 +565,10 @@ public sealed class FrameworkParametersCompletionProvider : CompletionProvider
 
         public EmbeddedCompletionContext(
             CompletionContext context,
-            RoutePatternTree tree,
-            WellKnownTypes wellKnownTypes)
+            RoutePatternTree tree)
         {
             _context = context;
             Tree = tree;
-            WellKnownTypes = wellKnownTypes;
             Position = _context.Position;
             Trigger = _context.Trigger;
             CancellationToken = _context.CancellationToken;
